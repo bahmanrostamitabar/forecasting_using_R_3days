@@ -1,0 +1,726 @@
+---
+title: "Africast-Time Series Analysis & Forecasting Using R"
+subtitle: "5. Basic modeling and forecasting"
+---
+
+## Outline
+
+\vspace*{0.7cm}\tableofcontents
+
+
+```{r}
+#| label: setup
+#| include: false
+#| cache: false
+source("setup.R")
+h02 <- tsibbledata::PBS |>
+  filter(ATC2 == "H02") |>
+  summarise(Cost = sum(Cost))
+melsyd <- tsibbledata::ansett |>
+  filter(Airports == "MEL-SYD")
+
+austa <- readxl::read_excel("data/340101.xlsx", sheet = "Data1", skip = 9) |>
+  rename(date = `Series ID`, value = A85375847A) |>
+  select(date, value) |>
+  transmute(
+    Month = yearmonth(date),
+    Visitors = value / 1e3
+  ) |>
+  bind_rows(tibble(
+    Month = yearmonth(seq(as.Date("2021-11-01"), by = "1 month", length = 2)),
+    Visitors = NA_real_
+  )) |>
+  as_tsibble(index = Month) |>
+  filter(Month >= yearmonth("2000 Jan"))
+```
+
+# Statistical forecasting
+
+## Forecasting workflow
+
+```{r forecasting_process,echo=FALSE, fig.align='center'}
+knitr::include_graphics("figs/forecasting_workflow.png")
+```
+
+## Statistical forecasting steps
+
+* Prepare data.
+* Visualise data.
+* Choosing and fitting models (specify and train models).
+* Produce forecast.
+* Evaluate quality.
+
+## What is a forecast?
+
+```{r austa, echo=FALSE}
+austa <- readxl::read_excel("data/340101.xlsx", sheet = "Data1", skip = 9) |>
+  rename(date = `Series ID`, value = A85375847A) |>
+  select(date, value) |>
+  transmute(
+    Month = yearmonth(date),
+    Visitors = value / 1e3
+  ) |>
+  bind_rows(tibble(
+    Month = yearmonth(seq(as.Date("2021-11-01"), by = "1 month", length = 2)),
+    Visitors = NA_real_
+  )) |>
+  as_tsibble(index = Month) |>
+  filter(Month >= yearmonth("2000 Jan"))
+# Grab ABS data
+# Fit ETS model
+fit <- austa |>
+  filter(Month < yearmonth("2018 Jan")) |>
+  model(ETS(Visitors))
+# Product forecasts
+fc <- forecast(fit, h = 48) |>
+  mutate(Month = as.Date(Month))
+# Simulate 100 future sample paths
+set.seed(1967)
+sim <- fit |>
+  generate(h = 48, times = 100) |>
+  mutate(
+    replicate = factor(.rep, levels = 1:100, labels = paste("Future", 1:100)),
+    .rep = as.numeric(.rep)
+  ) |>
+  as_tibble() |>
+  mutate(Month = as.Date(Month))
+# Nice colors
+cols <- scale_colour_manual(
+  values = c("#D55E00", "#0072B2", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#F0E442", sample(rainbow(93))),
+  breaks = paste("Future", 1:100),
+  name = " "
+)
+# Now build up some plots with alignment
+p1 <- austa |>
+  mutate(Visitors = if_else(Month >= yearmonth("2018 Jan"), NA_real_, Visitors)) |>
+  as_tibble() |>
+  mutate(Month = as.Date(Month)) |>
+  ggplot(aes(x = Month, y = Visitors)) +
+  geom_line() +
+  labs(
+    x = "Month",
+    y = "Thousands of visitors",
+    title = "Total short-term visitors to Australia"
+  ) +
+  scale_x_date(
+    breaks = seq(as.Date("2000-01-01"), by = "5 years", l = 5),
+    labels = paste("Jan", seq(2000, 2020, by = 5)),
+    minor_breaks = seq(as.Date("2001-01-01"), by = "1 year", l = 25)
+  ) +
+  ylim(min(austa$Visitors, sim$.sim, na.rm = TRUE), max(austa$Visitors, sim$.sim, na.rm = TRUE))
+p2 <- p1 + cols +
+  geom_line(aes(y = .sim, group = replicate, colour = replicate),
+    data = sim |> filter(.rep <= 1)
+  )
+p3 <- p1 + cols +
+  geom_line(aes(y = .sim, group = replicate, colour = replicate),
+    data = sim |> filter(.rep <= 2)
+  )
+p4 <- p1 + cols +
+  geom_line(aes(y = .sim, group = replicate, colour = replicate),
+    data = sim |> filter(.rep <= 3)
+  )
+p5 <- p1 + cols +
+  geom_line(aes(y = .sim, group = replicate, colour = replicate),
+    data = sim |> filter(.rep <= 10)
+  )
+p6 <- p1 + cols +
+  geom_line(aes(y = .sim, group = replicate, colour = replicate), alpha = 0.5, data = sim) +
+  guides(colour = "none")
+p7 <- p1 +
+  geom_line(aes(y = .sim, group = replicate, colour = replicate), alpha = 0.5, col = "gray", data = sim) +
+  guides(colour = "none")
+p8 <- p7 + autolayer(fc, level = c(50, 90))
+p9 <- p8 + coord_cartesian(xlim = as.Date(c("2014-01-01", "2021-08-01"))) +
+  scale_x_date(
+    breaks = seq(as.Date("2000-01-01"), by = "2 years", l = 11),
+    labels = paste("Jan", seq(2000, 2020, by = 2)),
+    minor_breaks = seq(as.Date("2001-01-01"), by = "1 year", l = 25)
+  )
+aligned_plots <- align_patches(p1, p2, p3, p4, p5, p6, p7, p8, p9)
+```
+
+\forecast\pause
+
+```{r austa1, dependson="austa", echo=FALSE}
+aligned_plots[[1]]
+```
+
+## What is a forecast?
+
+\forecast
+
+```{r austa2, dependson='austa', echo=FALSE}
+aligned_plots[[2]]
+```
+
+\simfutures
+
+## What is a forecast?
+
+\forecast
+
+```{r austa3, dependson='austa', echo=FALSE}
+aligned_plots[[3]]
+```
+
+\simfutures
+
+## What is a forecast?
+
+\forecast
+
+```{r austa4, dependson='austa', echo=FALSE}
+aligned_plots[[4]]
+```
+
+\simfutures
+
+## What is a forecast?
+
+\forecast
+
+```{r austa5, dependson='austa', echo=FALSE}
+aligned_plots[[5]]
+```
+
+\simfutures
+
+## What is a forecast?
+
+\forecast
+
+```{r austa6, dependson='austa', echo=FALSE}
+aligned_plots[[6]]
+```
+
+\simfutures
+
+## What is a forecast?
+
+\forecast
+
+```{r austa7, dependson='austa', echo=FALSE}
+aligned_plots[[7]]
+```
+
+\simfutures
+
+## What is a forecast?
+
+\forecast
+
+```{r austa8, dependson='austa', echo=FALSE}
+aligned_plots[[8]]
+```
+
+\simfutures
+
+## Prediction interval
+
+\forecast
+
+```{r austa9, dependson='austa', echo=FALSE}
+aligned_plots[[9]]
+```
+
+\simfutures
+
+## Visualising forecast distributions
+
+```{r viz-prob-forecast,echo=FALSE, out.width="70%", fig.align='center'}
+knitr::include_graphics("figs/daily_probabilistic_forecast.png")
+```
+
+## Forecast distribution
+
+```{r fcst-viz-dist,echo=FALSE, out.width="70%", fig.align='center'}
+knitr::include_graphics("figs/forecasts_probabilistic_perspective.png")
+```
+
+## Statistical forecasting
+
+- Thing to be forecast: $y_{T+h}$.
+- What we know: $y_1,\dots,y_T$.
+- Forecast distribution: ${y}_{T+h|t} = y_{T+h} \mid \{y_1,y_2,\dots,y_{T}\}$.
+- Point forecast: $\hat{y}_{T+h|T} =\text{E}[y_{T+h} \mid y_1,\dots,y_T]$.
+- Forecast variance: $\text{Var}[y_{t}  \mid y_1,\dots,y_T]$
+- Prediction interval is a range of values of $y_{T+h}$ with high probability.
+
+
+# What can we forecast?
+
+## What can we forecast?
+
+\forecast
+
+```{r austa9b, dependson='austa', echo=FALSE}
+aligned_plots[[9]] +
+  geom_line(
+    colour = "black",
+    data = austa |> filter(Month >= yearmonth("2018 Jan")) |> mutate(Month = as.Date(Month))
+  )
+```
+
+\simfutures
+
+## What can we forecast?
+
+\full{nasdaq-stock-market}
+
+## What can we forecast?
+
+\full{Forex2}
+
+## What can we forecast?
+
+\full{pills}
+
+## What can we forecast?
+
+\full{elecwires2}
+
+## What can we forecast?
+
+\full{AusBOM}
+
+## What can we forecast?
+
+\full{ts22015}
+
+## What can we forecast?
+
+\full{comet}
+
+## Which is easiest to forecast?
+
+ 1. daily electricity demand in 3 days time
+ 2. timing of next Halley's comet appearance
+ 3. time of sunrise this day next year
+ 4. Google stock price tomorrow
+ 5. Google stock price in 6 months time
+ 6. maximum temperature tomorrow
+ 7. exchange rate of \$US/AUS next week
+ 8. total sales of drugs in Australian pharmacies next month
+
+\pause
+
+ - how do we measure "easiest"?
+ - what makes something easy/difficult to forecast?
+
+## Factors affecting forecastability
+
+Something is easier to forecast if:
+
+ - we have a good understanding of the factors that contribute to it
+ - there is lots of data available;
+ - the forecasts cannot affect the thing we are trying to forecast.
+ - there is relatively low natural/unexplainable random variation.
+ - the future is somewhat similar to the past
+
+
+# Benchmark methods
+
+## Some simple forecasting methods
+
+```{r ausbeer, out.width="90%", echo=FALSE}
+new_production <- aus_production |>
+  filter(year(Quarter) >= 1992)
+new_production |> autoplot(Beer) +
+  labs(
+    x = "Year", y = "megalitres",
+    title = "Australian quarterly beer production"
+  )
+```
+
+\begin{textblock}{7}(0.4,6.9)
+\begin{alertblock}{}
+\small{How would you forecast these series?}
+\end{alertblock}
+\end{textblock}
+
+## Some simple forecasting methods
+
+```{r pigs, out.width="90%", echo=FALSE}
+aus_livestock |>
+  filter(
+    between(year(Month), 1992, 1996),
+    Animal == "Pigs", State == "Victoria"
+  ) |>
+  autoplot(Count) +
+  labs(
+    x = "Year", y = "thousands",
+    title = "Number of pigs slaughtered in Victoria, 1990-1995"
+  )
+```
+
+\begin{textblock}{7}(0.4,6.9)
+\begin{alertblock}{}
+\small{How would you forecast these series?}
+\end{alertblock}
+\end{textblock}
+
+## Some simple forecasting methods
+
+```{r dj, out.width="90%", echo=FALSE}
+gafa_stock |>
+  filter(Symbol == "FB", Date >= ymd("2018-01-01")) |>
+  autoplot(Close) +
+  labs(
+    title = "Facebook closing stock price in 2018",
+    x = "Date", y = "Closing price ($USD)"
+  )
+```
+
+\begin{textblock}{7}(0.4,6.9)
+\begin{alertblock}{}
+\small{How would you forecast these series?}
+\end{alertblock}
+\end{textblock}
+
+## Some simple forecasting methods
+\fontsize{13}{14}\sf
+
+### `MEAN(y)`: Average method
+
+  * Forecast of all future values is equal to mean of historical data $\{y_1,\dots,y_T\}$.
+  * Forecasts: $\hat{y}_{T+h|T} = \bar{y} = (y_1+\dots+y_T)/T$
+
+```{r mean-method-explained, echo=FALSE, message=FALSE, warning=FALSE, fig.height = 3.4}
+bricks <- aus_production |>
+  filter(!is.na(Bricks)) |>
+  mutate(average = mean(Bricks))
+
+fc <- bricks |>
+  model(MEAN(Bricks)) |>
+  forecast(h = "5 years")
+
+bricks |>
+  ggplot(aes(x = Quarter, y = Bricks)) +
+  geom_line() +
+  geom_line(aes(y = average), colour = "blue", linetype = "dashed") +
+  geom_line(aes(y = .mean), data = fc, colour = "blue") +
+  labs(title = "Clay brick production in Australia")
+```
+
+## Some simple forecasting methods
+\fontsize{13}{14}\sf
+
+### `NAIVE(y)`: Naïve method
+
+  * Forecasts equal to last observed value.
+  * Forecasts: $\hat{y}_{T+h|T} =y_T$.
+  * Consequence of efficient market hypothesis.
+
+```{r naive-method-explained, echo = FALSE, warning = FALSE, fig.height = 3.4}
+bricks |>
+  filter(!is.na(Bricks)) |>
+  model(NAIVE(Bricks)) |>
+  forecast(h = "5 years") |>
+  autoplot(filter(bricks, year(Quarter) > 1990), level = NULL) +
+  geom_point(aes(y = Bricks), data = slice(bricks, n()), colour = "blue") +
+  labs(title = "Clay brick production in Australia")
+```
+
+## Some simple forecasting methods
+\fontsize{13}{14}\sf
+
+### `SNAIVE(y ~ lag(m))`: Seasonal naïve method
+
+  * Forecasts equal to last value from same season.
+  * Forecasts: $\hat{y}_{T+h|T} =y_{T+h-m(k+1)}$, where $m=$ seasonal period and $k$ is the integer part of $(h-1)/m$.
+
+```{r snaive-method-explained, echo = FALSE, warning = FALSE, fig.height = 3.4}
+bricks |>
+  model(SNAIVE(Bricks ~ lag("year"))) |>
+  forecast(h = "5 years") |>
+  autoplot(filter(bricks, year(Quarter) > 1990), level = NULL) +
+  geom_point(aes(y = Bricks), data = slice(bricks, (n() - 3):n()), colour = "blue") +
+  labs(title = "Clay brick production in Australia")
+```
+
+## Some simple forecasting methods
+\fontsize{13}{14}\sf
+
+### `RW(y ~ drift())`: Drift method
+
+ * Forecasts equal to last value plus average change.
+ * Forecasts:\vspace*{-.7cm}
+
+ \begin{align*}
+ \hat{y}_{T+h|T} & =  y_{T} + \frac{h}{T-1}\sum_{t=2}^T (y_t-y_{t-1})\\
+                 & = y_T + \frac{h}{T-1}(y_T -y_1).
+ \end{align*}\vspace*{-0.2cm}
+
+   * Equivalent to extrapolating a line drawn between first and last observations.
+
+## Some simple forecasting methods
+
+### Drift method
+
+```{r drift-method-explained, echo = FALSE, warning = FALSE}
+aus_production |>
+  filter(!is.na(Bricks)) |>
+  model(RW(Bricks ~ drift())) |>
+  forecast(h = "5 years") |>
+  autoplot(aus_production, level = NULL) +
+  geom_line(
+    aes(y = Bricks),
+    data = slice(aus_production, range(cumsum(!is.na(Bricks)))),
+    linetype = "dashed", colour = "blue"
+  ) +
+  labs(title = "Clay brick production in Australia")
+```
+
+# Specify and estimate
+
+## Model specification
+
+- Model specification in fable supports a formula based interface 
+- A model formula in R is expressed using `response ~ terms`
+    - the formula’s left side describes the response 
+    - the right describes terms used to model the response.
+- `Attention`: MODEL name is in capital letters, e.g. `SNAIVE`
+
+## Model estimation
+
+The `model()` function trains models on data.
+- It returns a `mable` object.
+
+\fontsize{10}{13}\sf
+
+```{r model_template, eval=FALSE, echo=TRUE}
+# Fit the models
+my_mable <- my_data %>%
+  model(
+    choose_name1 = MODEL1(response ~ term1+...),
+    choose_name2 = MODEL2(response ~ term1+...),
+    choose_name3 = MODEL3(response ~ term1+...),
+    choose_name4 = MODEL4(response ~ term1+...)
+  )
+```
+
+
+## Model fitting- example
+
+The `model()` function trains models on data.
+
+\fontsize{10}{11}\sf
+
+```{r beer-model}
+beer_fit <- aus_production |>
+  model(
+    `Seasonal_naïve` = SNAIVE(Beer),
+    `Naïve` = NAIVE(Beer),
+    Drift = RW(Beer ~ drift()),
+    Mean = MEAN(Beer)
+  )
+```
+
+```{r beer-model2, echo=FALSE, dependson='beer-model'}
+beer_fit
+```
+
+\vspace*{0.2cm}\begin{alertblock}{}
+A \texttt{mable} is a model table, each cell corresponds to a fitted model.
+\end{alertblock}
+
+## Extract information from `mable`
+
+\fontsize{10}{12}\sf
+```{r beer-mablea, eval= FALSE, dependson='beer-model'}
+beer_fit %>% select(snaive) %>% report()
+beer_fit %>% tidy()
+beer_fit %>% glance()
+```
+
+- The `report()` function gives a formatted model-specific display.
+- The `tidy()` function is used to extract the coefficients from the models.
+- We can extract information about some specific model using the `filter()` and `select()`functions.
+
+## Check model performance
+
+Once a model has been fitted, it is important to check  how well it has performed on the data. I come back to this latter.
+
+# Produce forecasts
+
+## Producing forecasts
+
+- The `forecast()` function is used to produce forecasts from estimated models.
+- **h** can be specified with:
+    * a number (the number of future observations)
+    * natural language (the length of time to predict)
+    * provide a dataset of future time periods
+    
+## Producing forecasts
+
+\fontsize{10}{13}\sf
+
+```{r beer-fc, echo = TRUE, dependson='beer-model'}
+beer_fc <- beer_fit |>
+  forecast(h = "5 years")
+```
+
+```{r beer-fbl, echo = FALSE, dependson='beer-fc'}
+print(beer_fc, n = 4)
+```
+
+\vspace*{0.2cm}\begin{alertblock}{}
+A \texttt{fable} is a forecast table with point forecasts and distributions.
+\end{alertblock}
+
+## Visualising forecasts
+
+\footnotesize
+
+```{r beer-fc-plot, warning=FALSE, message=FALSE, fig.height=3.4, dependson='brick-fc'}
+beer_fc |>
+  autoplot(aus_production, level = NULL) +
+  labs(title = "Forecasts for quarterly beer production",
+       x = "Quarter", y = "Megalitres") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+
+## Forecast distributions
+
+ * A forecast $\hat{y}_{T+h|T}$ is (usually) the mean of the conditional distribution $y_{T+h} \mid y_1, \dots, y_{T}$.
+ * Most time series models produce normally distributed forecasts.
+ * The forecast distribution describes the probability of observing any future value.
+
+## Forecast distributions - normal distribution
+
+\fontsize{14}{18}\sf
+
+Assuming residuals are normal, uncorrelated, sd = $\hat\sigma$:
+
+\begin{block}{}
+\begin{tabular}{ll}
+\bf Mean: & $\hat{y}_{T+h|T} \sim N(\bar{y}, (1 + 1/T)\hat{\sigma}^2)$\\[0.2cm]
+\bf Naïve: & $\hat{y}_{T+h|T} \sim N(y_T, h\hat{\sigma}^2)$\\[0.2cm]
+\bf Seasonal naïve: & $\hat{y}_{T+h|T} \sim N(y_{T+h-m(k+1)}, (k+1)\hat{\sigma}^2)$\\[0.2cm]
+\bf Drift: & $\hat{y}_{T+h|T} \sim N(y_T + \frac{h}{T-1}(y_T - y_1),h\frac{T+h}{T}\hat{\sigma}^2)$
+\end{tabular}
+\end{block}
+
+where $k$ is the integer part of $(h-1)/m$.
+
+Note that when $h=1$ and $T$ is large, these all give the same approximate forecast variance: $\hat{\sigma}^2$.
+ 
+## Forecast distributions from bootstrapping
+
+When a normal distribution for the residuals is an unreasonable assumption, one alternative is to use bootstrapping, which only assumes that the residuals are uncorrelated with constant variance.
+
+- A one-step forecast error is defined as $e_t = y_t - \hat{y}_{t|t-1}$, $y_t = \hat{y}_{t|t-1} + e_t.$
+
+- So we can simulate the next observation of a time series using $y_{T+1} = \hat{y}_{T+1|T} + e_{T+1}$
+
+- Adding the new simulated observation to our data set, we can repeat the process to obtain $y_{T+2} = \hat{y}_{T+2|T+1} + e_{T+2}$
+
+## Generate many possible future using `generate()`
+\fontsize{10}{13}\sf
+
+```{r generate, echo=TRUE}
+beer_2000 <- aus_production |> filter(year(Quarter) == 2000) |> select(Beer)
+fit <- beer_2000 |>
+  model(NAIVE(Beer))
+sim <- fit |> generate(h = 12, times = 5, bootstrap = TRUE)
+sim
+```
+
+## Generate 5 different futures
+\fontsize{10}{13}\sf
+
+```{r visualise-future, echo=FALSE}
+beer_2000 |> 
+  ggplot(aes(x = Quarter)) +
+  geom_line(aes(y = Beer)) +
+  geom_line(aes(y = .sim, colour = as.factor(.rep)),
+    data = sim)+
+  labs(colour="Future")
+```
+
+## Use `forecast()` function to generate probabilistic forecasts
+\fontsize{10}{13}\sf
+
+```{r probabilistic-forecast, echo=TRUE}
+fc <- fit |> forecast(h = 12, bootstrap = TRUE)
+fc
+```
+
+
+## Prediction intervals
+
+- Forecast intervals can be extracted using the `hilo()` function.
+
+\fontsize{10}{13}\sf
+```{r fb-fc, echo=TRUE}
+fit <- aus_production |> select(Beer) %>% model(NAIVE(Beer))
+forecast(fit) %>% hilo(level = 95) %>% unpack_hilo("95%")
+```
+
+## Prediction intervals
+\fontsize{10}{12}\sf
+
+```{r beer-fc-interval, dependson='beer-fc'}
+beer_fc |>
+  hilo(level = c(50, 75))
+```
+
+## Prediction intervals
+\fontsize{10}{12}\sf
+
+```{r beer-fc-interval2, dependson='beer-fc'}
+beer_fc |>
+  hilo(level = c(50, 75)) |>
+  mutate(lower = `50%`$lower, upper = `50%`$upper)
+```
+
+# Fitted values and residuals
+
+## Fitted values
+
+ - $\hat{y}_{t|t-1}$ is the forecast of $y_t$ based on observations $y_1,\dots,y_t$.
+ - We call these "fitted values".
+ - Sometimes drop the subscript: $\hat{y}_t \equiv \hat{y}_{t|t-1}$.
+ - Often not true forecasts since parameters are estimated on all data.
+
+### For example:
+
+ - $\hat{y}_{t} = \bar{y}$ for average method.
+ - $\hat{y}_{t} = y_{t-1} + (y_{T}-y_1)/(T-1)$ for drift method.
+
+## Forecasting residuals
+
+\begin{block}{}
+\textbf{Residuals in forecasting:} difference between observed value and its fitted value: $e_t = y_t-\hat{y}_{t|t-1}$.
+\end{block}
+
+
+
+## Beer production - augment
+\fontsize{10}{10}\sf
+
+```{r augment}
+fit <- aus_production |> select(Beer) %>% model(SNAIVE(Beer))
+augment(fit)
+```
+
+## Beer production - fitted values
+\fontsize{10}{10}\sf
+
+```{r dj4, echo=TRUE, warning=FALSE, fig.height=3.4, dependson="augment"}
+augment(fit) |>
+  ggplot(aes(x = Quarter)) +
+  geom_line(aes(y = Beer, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted"))
+```
+
+## Beer production - residuals
+\fontsize{10}{10}\sf
+
+```{r dj5, echo=TRUE, warning = FALSE, dependson="augment"}
+augment(fit) |>
+  autoplot(.resid) +
+  labs(x = "Quarter", y = "", title = "Residuals from snaïve method")
+```

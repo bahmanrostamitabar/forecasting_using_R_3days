@@ -1,0 +1,139 @@
+---
+title: "Tidy Time Series & Forecasting Using R"
+author: ""
+---
+
+```{r}
+#| label: setup
+#| include: false
+#| cache: false
+source("setup.R")
+```
+
+## Instructor
+
+\placefig{0.6}{1.5}{width=3.5cm}{Bahman}
+\begin{textblock}{8.2}(5.6,1.3)
+\begin{alertblock}{Prof. Bahman Rostami-Tabar}
+\href{https://www.bahmanrt.com/}{\faIcon{home} bahmanrt.com}\\
+\href{https://github.com/bahmanrostamitabar}{\faIcon{github}  @bahmanrostamitabar}\\
+\href{mailto:Rostami-TabarB@cardiff.ac.uk}{\faIcon{envelope}  Rostami-TabarB@cardiff.ac.uk}
+\end{alertblock}
+\end{textblock}
+
+
+## Assumptions
+
+  * This is not an introduction to R. We assume you are broadly comfortable with R code, the RStudio environment and the tidyverse.
+  * This is not a statistics course. We assume you are familiar with concepts such as the mean, standard deviation, quantiles, regression, normal distribution, likelihood, etc.
+  * This is not a theory course. We are not going to derive anything. We will teach you time series and forecasting tools, when to use them, and how to use them most effectively.
+
+
+
+## Key reference
+
+\large
+
+\begin{block}{}\bf
+\hangafter=1\hangindent=.3cm
+ {Hyndman, R.~J. \& Athanasopoulos, G. (2021) \emph{Forecasting: principles and practice}, 3rd ed.}
+\end{block}\pause
+\begin{alertblock}{}\Large
+\centerline{\bf OTexts.org/fpp3/}
+\end{alertblock}
+
+\pause
+
+  * Free and online
+  * Data sets in associated R package
+  * R code for examples
+  
+## Reference - Recommended
+
+\large
+
+\begin{block}{}\bf
+\hangafter=1\hangindent=.3cm
+ {Kolassa S., Rostami-Tabar B., \& Siemsen, E. (2023) \emph{https://dfep.netlify.app/}, 1st ed.}
+\end{block}\pause
+\begin{alertblock}{}\Large
+\centerline{\bf https://dfep.netlify.app/}
+\end{alertblock}
+
+\pause
+\fontsize{11}{11}\sf
+  
+  * Free and online
+  * Not an in-depth technical book
+  * Mindset behind forecasting
+  * Overview of forecasting methods and processes
+
+## International Institute of Forecasters (IIF)
+
+- Certificate will be provided by IIF. You need to attend all lectures and exercise sessions to get the certificate.
+
+- a nonprofit organization founded in 1982, is dedicated to developing and furthering the generation, distribution, and use of knowledge on forecasting
+
+## [Forecasting for Social Good committee](https://www.f4sg.org/)
+
+- [Follow us on Linkedin](https://www.linkedin.com/company/f4sg/)
+- [Follow us on Twitter](https://twitter.com/FSG_forecast)
+- Use #AFRICAST, #F4SG if you post on social media about the workshop
+
+## Poll: [How proficient are you in using R?](https://www.menti.com/alfmobtvo9wb)
+
+\fontsize{14}{15}\sf
+
+  1. Guru: The R core team come to me for advice.
+  1. Expert: I have written several packages on CRAN.
+  1. Skilled: I use it regularly and it is an important part of my job.
+  1. Comfortable: I use it often and am comfortable with the tool.
+  1. User: I use it sometimes, but I am often searching around for the right function.
+  1. Learner: I have used it a few times.
+  1. Beginner: I've managed to download and install it.
+  1. Unknown: Why are you speaking like a pirate?
+  
+## Poll: [How experienced are you in forecasting](https://www.menti.com/alfmobtvo9wb)
+
+  1. Guru: I wrote the book, done it for decades, now I do the conference circuit.
+  2. Expert: It has been my full time job for more than a decade.
+  3. Skilled: I have been doing it for years.
+  1. Comfortable: I understand it and have done it.
+  1. Learner: I am still learning.
+  1. Beginner: I have heard of it and would like to learn more.
+  1. Unknown: What is forecasting? Is that what the weather people do?
+
+## Install required packages
+
+```r
+install.packages(c(
+  "tidyverse",
+  "fpp3",
+  "GGally",
+  "sugrrants",
+  "astsa"
+))
+```
+
+## Approximate outline
+\vspace*{-0.1cm}\centering\fontsize{12}{12}\sf
+\begin{tabular}{rp{8.6cm}l}
+  \bf Session & \bf Topic                   & \bf Chapter \\
+  \midrule
+  1       & 1. Basics of time series and data structures    & 2 \\
+  1       & 2. Time series patterns and basic graphics      & 2 \\
+  2       & 3. Transforming / adjusting time series         & 3 \\
+  2       & 4. Computing and visualizing features     & 4 \\
+  3       & 5. Basic modeling / forecasting & 1,3,5 \\
+  3       & 6. Forecasting with regression         & 7,10 \\
+  4       & 7. Exponential smoothing       & 8 \\
+  4       & 8. ARIMA models                & 9 \\
+  5       & 9. Basic training and test accuracy       & 5 \\
+  5       & 10. Residual diagnostics and cross validation                & 5 \\
+  \bottomrule
+\end{tabular}
+
+\vspace*{.0cm}\begin{alertblock}{}{\centerline{\Large\textbf{https://workshop.f4sg.org/africast/}}}
+\end{alertblock}
+
+
